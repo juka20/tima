@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Виртуальная лаборатория физики</title>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500&family=Unbounded:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bl:#0d3b8e;--dk:#092a66;--ln:#ffffff2e;--tx:#f2f7ff;--mt:#a9c1ee;--am:#ffd23f;--co:#ff8a65;--cy:#7fe3ff}
+*{box-sizing:border-box;margin:0}
+body{font:16px/1.55 Onest,system-ui,sans-serif;color:var(--tx);min-height:100vh;background:linear-gradient(#ffffff0f 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,#ffffff0f 1px,transparent 1px) 0 0/28px 28px,var(--bl)}
+header{max-width:1200px;margin:auto;padding:40px 20px 12px}
+h1{font:600 clamp(26px,5vw,44px)/1.1 Unbounded,system-ui}
+header p{color:var(--mt);margin-top:10px;max-width:52ch}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 20px;max-width:1200px;margin:auto;scrollbar-width:none}
+nav button{flex:none;background:none;color:var(--mt);border:1px solid var(--ln);border-radius:4px;padding:8px 16px;font:500 14px Onest,system-ui;cursor:pointer;transition:.2s}
+nav button:hover{color:var(--tx);border-color:var(--mt)}
+nav button.on{background:var(--am);color:#0a1f4d;border-color:var(--am)}
+.lab{display:grid;grid-template-columns:1fr 330px;gap:16px;max-width:1200px;margin:auto;padding:6px 20px 48px}
+.stage{position:relative;border:1px solid var(--ln);border-radius:6px;overflow:hidden;height:clamp(340px,62svh,560px);background:linear-gradient(#ffffff0d 1px,transparent 1px) 0 0/36px 36px,linear-gradient(90deg,#ffffff0d 1px,transparent 1px) 0 0/36px 36px,var(--dk)}
+canvas{width:100%;height:100%;display:block}
+#ro{position:absolute;left:12px;top:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+#ro div{background:#092a66e6;border:1px solid var(--ln);border-radius:4px;padding:5px 10px;font-size:12px;color:var(--mt)}
+#ro b{display:block;color:var(--am);font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
+aside{background:var(--dk);border:1px solid var(--ln);border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px}
+aside h2{font:600 19px Unbounded,system-ui}
+aside p{color:var(--mt);font-size:14px}
+#ctl{display:grid;gap:16px}
+label span{display:flex;justify-content:space-between;font-size:14px;color:var(--mt)}
+label b{color:var(--tx);font-weight:500;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--am);margin-top:6px}
+.btns{display:flex;gap:8px}
+.btns button{flex:1;padding:10px;border-radius:4px;border:1px solid var(--ln);background:none;color:var(--tx);cursor:pointer;font:inherit;transition:.2s}
+.btns button:hover{border-color:var(--am);color:var(--am)}
+@media(max-width:860px){.lab{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header><h1>Виртуальная лаборатория</h1><p>Шесть опытов по физике. Двигай ползунки — и смотри, как меняется поведение системы.</p></header>
+<nav id="nav"></nav>
+<div class="lab"><div class="stage"><canvas id="cv"></canvas><div id="ro"></div></div>
+<aside><h2 id="ti"></h2><p id="ds"></p><div id="ctl"></div><div class="btns"><button id="pp">Пауза</button><button id="rs">Сначала</button></div></aside></div>
+<script>
+const $=s=>document.querySelector(s),cv=$('#cv'),c=cv.getContext('2d'),PI=Math.PI,rnd=(a,b)=>a+Math.random()*(b-a);
+let W,H,cur,S,P={},T=0,paused=false,last=0;
+function glow(x,y,r,col){const g=c.createRadialGradient(x,y,0,x,y,r*2.4);g.addColorStop(0,col+'ff');g.addColorStop(.4,col+'aa');g.addColorStop(1,col+'00');c.fillStyle=g;c.beginPath();c.arc(x,y,r*2.4,0,7);c.fill();c.fillStyle='#fff';c.beginPath();c.arc(x,y,r*.35,0,7);c.fill()}
+const E=[
+{n:'Маятник',d:'Период T = 2π√(L/g) не зависит от массы и при малых углах почти не зависит от амплитуды. Поставь угол 170° — формула перестанет работать.',
+c:[['L','Длина',.5,3,.1,1.5,' м'],['g','Ускорение g',1,25,.1,9.8,' м/с²'],['a','Начальный угол',5,170,1,60,'°'],['b','Трение',0,1,.01,.05,'']],
+init(){S={th:P.a*PI/180,w:0,tr:[]}},
+chg(k){k!='g'&&k!='b'&&this.init()},
+step(dt){const h=dt/8;for(let i=0;i<8;i++){S.w+=(-P.g/P.L*Math.sin(S.th)-P.b*S.w)*h;S.th+=S.w*h}},
+draw(){const k=(H-80)/3,px=W/2,py=30,x=px+P.L*k*Math.sin(S.th),y=py+P.L*k*Math.cos(S.th);
+S.tr.push([x,y]);S.tr.length>70&&S.tr.shift();
+S.tr.forEach((p,i)=>{c.fillStyle=`rgba(127,227,255,${i/S.tr.length*.6})`;c.beginPath();c.arc(p[0],p[1],3,0,7);c.fill()});
+c.strokeStyle='#a9c1ee';c.lineWidth=2;c.beginPath();c.moveTo(px,py);c.lineTo(x,y);c.stroke();
+c.fillStyle='#a9c1ee';c.fillRect(px-40,py-6,80,6);glow(x,y,16,'#ffd23f')},
+ro(){return[['Период (малые углы)',(2*PI*Math.sqrt(P.L/P.g)).toFixed(2)+' с'],['Угол',(S.th*180/PI).toFixed(0)+'°'],['Скорость',Math.abs(P.L*S.w).toFixed(2)+' м/с']]}},
+{n:'Бросок под углом',d:'По горизонтали тело летит равномерно, по вертикали — с ускорением g. Дальше всего летит при 45° (без сопротивления воздуха). Старые траектории остаются бледным следом.',
+c:[['v','Скорость',5,40,1,25,' м/с'],['a','Угол',5,85,1,45,'°'],['g','Ускорение g',1,25,.1,9.8,' м/с²']],
+init(){S={t:0,h:0,gh:[]}},
+chg(){S.t=0;S.h=0},
+step(dt){const tf=2*P.v*Math.sin(P.a*PI/180)/P.g;if(S.h>0){if((S.h-=dt)<=0){S.gh.push({...P});S.gh.length>4&&S.gh.shift();S.t=0}return}S.t+=dt*1.5;if(S.t>=tf){S.t=tf;S.h=1}},
+draw(){const r=P.a*PI/180,vx=P.v*Math.cos(r),vy=P.v*Math.sin(r),R=P.v*P.v*Math.sin(2*r)/P.g,Hm=vy*vy/2/P.g,k=Math.min((W-90)/Math.max(R,1),(H-90)/Math.max(Hm,1)),ox=45,oy=H-40;
+const pos=(p,t)=>{const a=p.a*PI/180;return[ox+p.v*Math.cos(a)*t*k,oy-(p.v*Math.sin(a)*t-p.g*t*t/2)*k]};
+const tfn=p=>2*p.v*Math.sin(p.a*PI/180)/p.g;
+const arc=(p,t1,col,w,dash)=>{c.strokeStyle=col;c.lineWidth=w;c.setLineDash(dash||[]);c.beginPath();for(let i=0;i<=60;i++){const q=pos(p,t1*i/60);i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1])}c.stroke();c.setLineDash([])};
+S.gh.forEach(p=>arc(p,tfn(p),'#ffffff33',1.5));
+arc(P,tfn(P),'#a9c1ee99',1.5,[6,6]);arc(P,S.t,'#ffd23f',3);
+c.strokeStyle='#7fe3ff88';c.lineWidth=2;c.beginPath();c.moveTo(0,oy);c.lineTo(W,oy);c.stroke();
+const q=pos(P,S.t);glow(q[0],q[1],10,'#ff8a65');
+c.strokeStyle='#7fe3ff';c.lineWidth=2;c.beginPath();c.moveTo(q[0],q[1]);c.lineTo(q[0]+vx*2.5,q[1]-(vy-P.g*S.t)*2.5);c.stroke()},
+ro(){const r=P.a*PI/180,s=Math.sin(r);return[['Дальность',(P.v*P.v*Math.sin(2*r)/P.g).toFixed(1)+' м'],['Высота',(P.v*P.v*s*s/2/P.g).toFixed(1)+' м'],['Время полёта',(2*P.v*s/P.g).toFixed(2)+' с'],['Скорость',Math.hypot(P.v*Math.cos(r),P.v*s-P.g*S.t).toFixed(1)+' м/с']]}},
+{n:'Пружина',d:'Груз на пружине колеблется по гармоническому закону с частотой ω = √(k/m). Жёсткая пружина — быстро, тяжёлый груз — медленно. Внизу строится график x(t).',
+c:[['m','Масса',.2,5,.1,1,' кг'],['k','Жёсткость',1,50,1,12,' Н/м'],['b','Трение',0,2,.05,.1,''],['A','Амплитуда',.2,1.5,.1,1,' м']],
+init(){S={x:P.A,v:0,h:[]}},
+chg(k){k=='A'&&this.init()},
+step(dt){const h=dt/8;for(let i=0;i<8;i++){S.v+=(-P.k*S.x-P.b*S.v)/P.m*h;S.x+=S.v*h}S.h.push(S.x);S.h.length>400&&S.h.shift()},
+draw(){const sc=W*.28/1.5,ex=W*.5,by=H*.3,bx=ex+S.x*sc,w=54,x1=bx-w/2;
+c.strokeStyle='#ffffff44';c.lineWidth=1;c.setLineDash([5,5]);c.beginPath();c.moveTo(ex,by-60);c.lineTo(ex,H*.62);c.stroke();c.setLineDash([]);
+c.fillStyle='#a9c1ee';c.fillRect(20,by-50,8,100);
+c.strokeStyle='#7fe3ff';c.lineWidth=3;c.lineJoin='round';c.beginPath();c.moveTo(28,by);
+for(let i=1;i<=14;i++)c.lineTo(28+(x1-28)*i/15,by+(i%2?-16:16));c.lineTo(x1,by);c.stroke();
+const g=c.createLinearGradient(0,by-w/2,0,by+w/2);g.addColorStop(0,'#ffd23f');g.addColorStop(1,'#ff8a65');c.fillStyle=g;c.beginPath();c.roundRect(x1,by-w/2,w,w,6);c.fill();
+const gy=H*.8,gh=H*.14;c.strokeStyle='#ffffff44';c.lineWidth=1;c.beginPath();c.moveTo(0,gy);c.lineTo(W,gy);c.stroke();
+c.strokeStyle='#ffd23f';c.lineWidth=2;c.beginPath();S.h.forEach((x,i)=>{const px=W-S.h.length*2+i*2,py=gy-x/1.5*gh;i?c.lineTo(px,py):c.moveTo(px,py)});c.stroke()},
+ro(){const w=Math.sqrt(P.k/P.m);return[['Частота ω',w.toFixed(2)+' рад/с'],['Период T',(2*PI/w).toFixed(2)+' с'],['Энергия',(.5*P.k*S.x*S.x+.5*P.m*S.v*S.v).toFixed(2)+' Дж']]}},
+{n:'Интерференция волн',d:'Две когерентные волны складываются: гребень на гребне даёт усиление (светлые полосы), гребень со впадиной — гашение (тёмные). Меняй расстояние и длину волны.',
+c:[['l','Длина волны',16,80,1,34,' px'],['d','Расстояние между источниками',30,320,2,140,' px'],['s','Скорость волны',20,120,1,60,' px/с']],
+init(){const o=document.createElement('canvas');o.width=Math.ceil(W/4);o.height=Math.ceil(H/4);S={o,x:o.getContext('2d')};S.i=S.x.createImageData(o.width,o.height)},
+step(){},
+draw(){const w=S.o.width,h=S.o.height,D=S.i.data,k=2*PI/P.l,om=k*P.s,x1=W/2-P.d/2,x2=W/2+P.d/2,y0=H/2;
+for(let j=0;j<h;j++)for(let i=0;i<w;i++){const X=i*4,Y=j*4,r1=Math.hypot(X-x1,Y-y0),r2=Math.hypot(X-x2,Y-y0),
+v=Math.sin(k*r1-om*T)/Math.sqrt(1+r1/50)+Math.sin(k*r2-om*T)/Math.sqrt(1+r2/50),a=Math.min(Math.abs(v)/1.5,1),n=(j*w+i)*4;
+if(v>0){D[n]=13+a*190;D[n+1]=59+a*186;D[n+2]=142+a*113}else{D[n]=13-a*8;D[n+1]=59-a*39;D[n+2]=142-a*70}D[n+3]=255}
+S.x.putImageData(S.i,0,0);c.imageSmoothingEnabled=true;c.drawImage(S.o,0,0,W,H);
+[x1,x2].forEach(x=>glow(x,y0,7,'#ffd23f'))},
+ro(){return[['Длина волны',P.l+' px'],['d / λ',(P.d/P.l).toFixed(1)],['Максимумов',2*Math.floor(P.d/P.l)+1]]}},
+{n:'Идеальный газ',d:'Молекулы упруго сталкиваются со стенками и друг с другом. Сначала у всех одна скорость, но после столкновений распределение само превращается в максвелловское (гистограмма внизу). Нагрей газ — цвет сдвинется к тёплому.',
+c:[['N','Частиц',10,150,1,70,''],['t','Температура',30,400,5,130,''],['r','Размер',4,14,1,7,' px']],
+init(){S={p:Array.from({length:P.N},()=>{const a=rnd(0,2*PI);return{x:rnd(20,W-20),y:rnd(20,H-20),vx:Math.cos(a)*P.t,vy:Math.sin(a)*P.t}})}},
+chg(k){if(k=='t'){const m=S.p.reduce((s,p)=>s+Math.hypot(p.vx,p.vy),0)/S.p.length||1;S.p.forEach(p=>{p.vx*=P.t/m;p.vy*=P.t/m})}else this.init()},
+step(dt){const r=P.r,p=S.p;p.forEach(a=>{a.x+=a.vx*dt;a.y+=a.vy*dt;if(a.x<r){a.x=r;a.vx=Math.abs(a.vx)}if(a.x>W-r){a.x=W-r;a.vx=-Math.abs(a.vx)}if(a.y<r){a.y=r;a.vy=Math.abs(a.vy)}if(a.y>H-r){a.y=H-r;a.vy=-Math.abs(a.vy)}});
+for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){const a=p[i],b=p[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<2*r&&d>0){const nx=dx/d,ny=dy/d,v=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;if(v>0){a.vx-=v*nx;a.vy-=v*ny;b.vx+=v*nx;b.vy+=v*ny}const o=(2*r-d)/2;a.x-=nx*o;a.y-=ny*o;b.x+=nx*o;b.y+=ny*o}}},
+draw(){const r=P.r,bins=Array(14).fill(0),mx=P.t*3;
+S.p.forEach(a=>{const s=Math.hypot(a.vx,a.vy),f=Math.min(s/(P.t*2),1);bins[Math.min(13,Math.floor(s/mx*14))]++;c.fillStyle=`hsl(${195-f*175} 90% 62%)`;c.beginPath();c.arc(a.x,a.y,r,0,7);c.fill()});
+const bx=W-170,by=H-95,bh=60,m=Math.max(...bins,1);bins.forEach((n,i)=>{c.fillStyle='#7fe3ffaa';c.fillRect(bx+i*11,by+bh-n/m*bh,9,n/m*bh)});c.fillStyle='#a9c1ee';c.font='11px Onest,system-ui';c.fillText('распределение скоростей',bx,by+bh+14)},
+ro(){const p=S.p,n=p.length;return[['Частиц',n],['Средняя скорость',(p.reduce((s,a)=>s+Math.hypot(a.vx,a.vy),0)/n).toFixed(0)+' px/с'],['Средняя энергия',(p.reduce((s,a)=>s+a.vx*a.vx+a.vy*a.vy,0)/2/n).toFixed(0)]]}},
+{n:'Орбиты',d:'Планета в поле тяжести звезды. Скорость 1 даёт круг, меньше — вытянутый эллипс, больше 1,41 (√2) — планета улетает по гиперболе. Тяжёлая звезда тянет сильнее.',
+c:[['M','Масса звезды',.5,3,.1,1,' M☉'],['v','Скорость запуска',.3,1.6,.01,.85,'×v₀']],
+init(){const r=Math.min(W,H)*.3,G=4e6*P.M;S={x:r,y:0,vx:0,vy:-P.v*Math.sqrt(G/r),G,tr:[]}},
+chg(){this.init()},
+step(dt){const n=30,h=dt/n;for(let i=0;i<n;i++){const q=Math.hypot(S.x,S.y),a=-S.G/(q*q*q);S.vx+=a*S.x*h;S.vy+=a*S.y*h;S.x+=S.vx*h;S.y+=S.vy*h}
+S.tr.push([S.x,S.y]);S.tr.length>400&&S.tr.shift();const r=Math.hypot(S.x,S.y);if(r<14||r>Math.max(W,H)*1.5)this.init()},
+draw(){const cx=W/2,cy=H/2;c.lineWidth=2;for(let i=1;i<S.tr.length;i++){c.strokeStyle=`rgba(127,227,255,${i/S.tr.length*.8})`;c.beginPath();c.moveTo(cx+S.tr[i-1][0],cy+S.tr[i-1][1]);c.lineTo(cx+S.tr[i][0],cy+S.tr[i][1]);c.stroke()}
+glow(cx,cy,10+P.M*5,'#ffd23f');glow(cx+S.x,cy+S.y,7,'#7fe3ff')},
+ro(){const r=Math.hypot(S.x,S.y),h=S.x*S.vy-S.y*S.vx,En=(S.vx*S.vx+S.vy*S.vy)/2-S.G/r,e=Math.sqrt(Math.max(0,1+2*En*h*h/(S.G*S.G)));return[['Эксцентриситет',e.toFixed(2)],['Орбита',e<.03?'круг':e<.99?'эллипс':e<1.01?'парабола':'гипербола'],['Расстояние',r.toFixed(0)+' px']]}}
+];
+function fit(){const b=cv.parentElement.getBoundingClientRect(),d=devicePixelRatio||1,w0=W,h0=H;W=b.width;H=b.height;cv.width=W*d;cv.height=H*d;c.setTransform(d,0,0,d,0,0);(w0!=W||h0!=H)&&cur&&cur.init()}
+function load(i){cur=E[i];P={};cur.c.forEach(a=>P[a[0]]=a[5]);
+[...$('#nav').children].forEach((b,j)=>b.classList.toggle('on',j==i));
+$('#ti').textContent=cur.n;$('#ds').textContent=cur.d;
+$('#ctl').innerHTML=cur.c.map(a=>`<label><span>${a[1]}<b>${a[5]}${a[6]}</b></span><input type=range min=${a[2]} max=${a[3]} step=${a[4]} value=${a[5]}></label>`).join('');
+$('#ctl').querySelectorAll('input').forEach((el,j)=>{const a=cur.c[j];el.oninput=()=>{P[a[0]]=+el.value;el.previousElementSibling.lastChild.textContent=el.value+a[6];cur.chg&&cur.chg(a[0])}});
+paused=false;$('#pp').textContent='Пауза';T=0;cur.init()}
+$('#nav').innerHTML=E.map(e=>`<button>${e.n}</button>`).join('');
+[...$('#nav').children].forEach((b,i)=>b.onclick=()=>load(i));
+$('#pp').onclick=()=>{paused=!paused;$('#pp').textContent=paused?'Продолжить':'Пауза'};
+$('#rs').onclick=()=>{cur.init();T=0};
+function loop(t){const dt=Math.min((t-last)/1000||0,.033);last=t;if(!paused){T+=dt;cur.step(dt)}
+c.clearRect(0,0,W,H);cur.draw();$('#ro').innerHTML=cur.ro().map(r=>`<div>${r[0]}<b>${r[1]}</b></div>`).join('');requestAnimationFrame(loop)}
+addEventListener('resize',fit);fit();load(0);requestAnimationFrame(loop);
+</script>
+</body></html>
